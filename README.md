@@ -35,6 +35,7 @@ GET  /apps/:appId/manifest
 GET  /apps/:appId/current
 GET  /apps/:appId/versions
 GET  /apps/:appId/updates
+GET  /apps/:appId/rollbacks
 POST /apps
 POST /apps/:appId/current
 POST /cases
@@ -43,6 +44,8 @@ POST /updates
 POST /updates/:workId/preflight
 POST /updates/:workId/release
 POST /updates/:workId/readback
+POST /rollbacks
+POST /rollbacks/:workId/readback
 POST /debug
 ```
 
@@ -82,3 +85,12 @@ POST /updates/:workId/readback
 - A mismatched readback may be retried; a verified update cannot be reopened through readback.
 - Runtime destination is required proof. Omitting it is a mismatch, not a pass.
 - A release manifest carries both `fromVersion` and target `version`, so the manifest-to-update path cannot lose the Current transition.
+
+
+## Rollback invariants
+
+- Rollback may target a `SUPERSEDED` historical version; that is the normal rollback source.
+- The rollback request records the exact target version, source revision, artifact SHA, and destination.
+- Current does not change when rollback is requested. It changes only after exact rollback runtime readback.
+- Missing or mismatched destination/revision/artifact keeps Current unchanged and records `MISMATCH`.
+- If one version number maps to multiple historical source revisions, the caller must provide `targetSourceRevision`; OLYMPUS will not guess.
