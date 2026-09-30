@@ -29,6 +29,12 @@ Runtime Readback = final reality check
 GET  /health
 GET  /snapshot
 GET  /cards
+GET  /apps
+GET  /apps/:appId
+GET  /apps/:appId/manifest
+GET  /apps/:appId/current
+GET  /apps/:appId/versions
+GET  /apps/:appId/updates
 POST /apps
 POST /apps/:appId/current
 POST /cases
@@ -49,3 +55,21 @@ npm run demo
 ```
 
 State is persisted as JSON through an atomic write. The core is intentionally adapter-driven: each application can define its own version scheme, storage, release method, readback method, migration rules, and rollback rules without changing OLYMPUS invariants.
+
+## Central app integration
+
+Register each target application once with an `appId`, destination, version scheme, and integration adapters. OLYMPUS then owns the version registry, current-version readback, update cards, release gates, and version history while the target application remains the owner of its runtime truth.
+
+The target application can use `src/client.mjs` or call:
+
+```txt
+GET /apps/:appId/manifest
+GET /apps/:appId/current
+GET /apps/:appId/versions
+```
+
+An update becomes `VERIFIED` only after the target reports matching version, source revision, artifact SHA, destination, and passing readback to:
+
+```txt
+POST /updates/:workId/readback
+```
