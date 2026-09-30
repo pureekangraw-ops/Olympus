@@ -20,6 +20,7 @@ export function createOlympusServer({ system } = {}) {
       if (method === "GET" && parts[0] === "apps" && parts[2] === "current") return json(res, 200, await system.currentVersion(parts[1]));
       if (method === "GET" && parts[0] === "apps" && parts[2] === "versions") return json(res, 200, await system.versions(parts[1]));
       if (method === "GET" && parts[0] === "apps" && parts[2] === "updates") return json(res, 200, (await system.appStatus(parts[1])).updates);
+      if (method === "GET" && parts[0] === "apps" && parts[2] === "rollbacks") return json(res, 200, (await system.snapshot()).rollbacks ? Object.values((await system.snapshot()).rollbacks).filter(item => item.appId === parts[1]) : []);
       if (method === "GET" && parts[0] === "apps" && parts.length === 2) return json(res, 200, await system.appStatus(parts[1]));
       const input = method === "POST" ? await body(req) : null;
       if (method === "POST" && parts[0] === "apps" && parts.length === 1) return json(res, 201, await system.registerApp(input));
@@ -30,6 +31,7 @@ export function createOlympusServer({ system } = {}) {
       if (method === "POST" && parts[0] === "updates" && parts[2] === "preflight") return json(res, 200, await system.preflight(parts[1]));
       if (method === "POST" && parts[0] === "updates" && parts[2] === "release") return json(res, 200, await system.release(parts[1]));
       if (method === "POST" && parts[0] === "updates" && parts[2] === "readback") return json(res, 200, await system.readback({ ...input, workId: parts[1] }));
+      if (method === "POST" && parts[0] === "rollbacks") return json(res, 201, await system.rollback(input));
       if (method === "POST" && parts[0] === "debug") return json(res, 201, await system.debug(input));
       return json(res, 404, { error:"NOT_FOUND" });
     } catch (error) { return json(res, 400, { error:error.message }); }
