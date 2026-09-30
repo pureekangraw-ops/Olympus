@@ -46,3 +46,69 @@ test("runtime destination is mandatory evidence for verification",async()=>{cons
   assert.equal(r.readbackResult,"MISMATCH");
   assert.equal((await system.currentVersion("demo-app")).version,"0.1.0");
 }finally{await rm(dir,{recursive:true,force:true})}});
+
+
+test("rollback can target superseded historical truth and changes Current only after exact rollback readback",async()=>{const {system,dir}=await setup();try{
+  const update=await system.createUpdate(input("WORK-UPGRADE"));
+  await system.preflight(update.workId);
+  await system.release(update.workId);
+  await system.readback({workId:update.workId,observedVersion:"0.2.0",observedRevision:"sha-next",observedArtifactSha:"artifact-next",observedDestination:"demo-runtime",passed:true,evidence:["runtime://upgrade"]});
+  assert.equal((await system.currentVersion("demo-app")).version,"0.2.0");
+  const historyBefore=await system.versions("demo-app");
+  assert.equal(historyBefore.find(v=>v.version==="0.1.0")?.status,"SUPERSEDED");
+
+  const rollback=await system.rollback({
+    workId:"WORK-ROLLBACK",
+    checkpointId:"CP-WORK-ROLLBACK",
+    appId:"demo-app",
+    targetVersion:"0.1.0",
+    reason:"regression",
+    evidence:["incident://1"],
+    approval:{status:"APPROVED",by:"BIG"}
+  });
+  assert.equal(rollback.status,"ROLLBACK_PENDING");
+  assert.equal(rollback.sourceRevision,"sha-current");
+  assert.equal((await system.currentVersion("demo-app")).version,"0.2.0");
+
+  const mismatch=await system.rollbackReadback({
+    workId:"WORK-ROLLBACK",
+    observedVersion:"0.1.0",
+    observedRevision:"sha-current",
+    observedArtifactSha:"artifact-current",
+    observedDestination:"wrong-runtime",
+    passed:true,
+    evidence:["runtime://wrong"]
+  });
+  assert.equal(mismatch.readbackResult,"MISMATCH");
+  assert.equal((await system.currentVersion("demo-app")).version,"0.2.0");
+
+  const verified=await system.rollbackReadback({
+    workId:"WORK-ROLLBACK",
+    observedVersion:"0.1.0",
+    observedRevision:"sha-current",
+    observedArtifactSha:"artifact-current",
+    observedDestination:"demo-runtime",
+    observedRuntimeIdentity:"runtime-0.1.0-restored",
+    passed:true,
+    evidence:["runtime://rollback"]
+  });
+  assert.equal(verified.readbackResult,"ROLLED_BACK");
+  assert.equal((await system.currentVersion("demo-app")).version,"0.1.0");
+  const historyAfter=await system.versions("demo-app");
+  assert.equal(historyAfter.at(-1).version,"0.1.0");
+  assert.equal(historyAfter.at(-1).status,"CURRENT");
+}finally{await rm(dir,{recursive:true,force:true})}});
+
+test("rollback API client exposes request, list, and exact readback",async()=>{const {system,dir}=await setup();const server=createOlympusServer({system});await new Promise(resolve=>server.listen(0,resolve));try{
+  const update=await system.createUpdate(input("WORK-UPGRADE-HTTP"));
+  await system.preflight(update.workId);
+  await system.release(update.workId);
+  await system.readback({workId:update.workId,observedVersion:"0.2.0",observedRevision:"sha-next",observedArtifactSha:"artifact-next",observedDestination:"demo-runtime",passed:true,evidence:["runtime://upgrade-http"]});
+  const client=createOlympusClient({baseUrl:`http://127.0.0.1:${server.address().port}`,appId:"demo-app"});
+  const rollback=await client.requestRollback({workId:"WORK-RB-HTTP",checkpointId:"CP-WORK-RB-HTTP",targetVersion:"0.1.0",reason:"rollback test",evidence:["test://rb"],approval:{status:"APPROVED",by:"BIG"}});
+  assert.equal(rollback.status,"ROLLBACK_PENDING");
+  assert.equal((await client.getRollbacks()).length,1);
+  const result=await client.rollbackReadback("WORK-RB-HTTP",{observedVersion:"0.1.0",observedRevision:"sha-current",observedArtifactSha:"artifact-current",observedDestination:"demo-runtime",passed:true,evidence:["runtime://rb-http"]});
+  assert.equal(result.readbackResult,"ROLLED_BACK");
+  assert.equal((await client.getCurrent()).version,"0.1.0");
+}finally{server.close();await rm(dir,{recursive:true,force:true})}});
