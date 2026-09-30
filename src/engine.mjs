@@ -40,11 +40,12 @@ export class OlympusSystem {
   }); }
   async registerCurrent(input) { return this.mutate(state => {
     const appId = assertAppId(input.appId); this.app(state, appId);
+    if (state.versions[appId]) throw new Error("CURRENT_ALREADY_REGISTERED_USE_RELEASE_READBACK");
     if (!state.versionHistory) state.versionHistory = {};
     state.versionHistory[appId] ||= [];
     const version = this.versionRecord(input, "CURRENT", state.apps[appId]);
-    this.recordVersion(state, appId, version, state.versions[appId] || null);
-    this.event(state, "CURRENT_REGISTERED", { appId, version: version.version });
+    this.recordVersion(state, appId, version, null);
+    this.event(state, "CURRENT_BOOTSTRAPPED", { appId, version: version.version });
     return version;
   }); }
   async listApps() {
@@ -111,6 +112,9 @@ export class OlympusSystem {
   }); }
   async preflight(workId) { return this.mutate(state => {
     const update = this.update(state, workId), reasons = [], app = this.app(state, update.appId);
+    if (![STATES.CANDIDATE, STATES.OUTBOUND_READY, STATES.OUTBOUND_BLOCKED].includes(update.status)) {
+      throw new Error("PREFLIGHT_STATE_INVALID");
+    }
     if (update.destination !== app.destination) reasons.push("DESTINATION_MISMATCH");
     if (!update.toVersion || update.toVersion === update.fromVersion) reasons.push("VERSION_TRANSITION_INVALID");
     if (!update.selectedDelta.length) reasons.push("DELTA_MISSING");
@@ -127,7 +131,11 @@ export class OlympusSystem {
     update.status = STATES.READBACK_PENDING; const output = card("RELEASE", { kind: "WORK_CARD", ...update }, this.now); state.cards.push(output); this.event(state, "RELEASED", { workId, toVersion: update.toVersion }); return output;
   }); }
   async readback(input) { return this.mutate(state => {
-    const update = this.update(state, input.workId), destinationMatch = input.observedDestination == null || input.observedDestination === update.destination;
+    const update = this.update(state, input.workId);
+    if (![STATES.READBACK_PENDING, STATES.MISMATCH].includes(update.status)) {
+      throw new Error("READBACK_STATE_INVALID");
+    }
+    const destinationMatch = input.observedDestination === update.destination;
     const matches = input.passed === true && input.observedVersion === update.toVersion && input.observedRevision === update.sourceRevision && input.observedArtifactSha === update.artifactSha && destinationMatch && (input.observedChecksumAlgorithm == null || input.observedChecksumAlgorithm === update.checksumAlgorithm);
     update.status = matches ? STATES.VERIFIED : STATES.MISMATCH;
     if (matches) this.recordVersion(state, update.appId, { appId: update.appId, version: update.toVersion, sourceRevision: update.sourceRevision, artifactSha: update.artifactSha, runtimeIdentity: input.observedRuntimeIdentity || input.observedRevision, status: "CURRENT", evidence: cloneValue(input.evidence || []), updatedAt: this.now() }, state.versions[update.appId] || null);
