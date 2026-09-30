@@ -1,0 +1,11 @@
+import { JsonStore } from "../src/store.mjs";
+import { OlympusSystem } from "../src/engine.mjs";
+const system=new OlympusSystem({store:new JsonStore("./.olympus/demo-state.json")});
+await system.registerApp({appId:"demo-app",versionScheme:"semver",destination:"demo-runtime"}).catch(()=>{});
+const state=await system.snapshot();
+if(!state.versions["demo-app"]) await system.registerCurrent({appId:"demo-app",version:"0.1.0",sourceRevision:"sha-current",artifactSha:"artifact-current",runtimeIdentity:"runtime-0.1.0"});
+const workId=`WORK-OLYMPUS-DEMO-${Date.now()}`;
+const update=await system.createUpdate({workId,checkpointId:`CP-${workId}`,appId:"demo-app",fromVersion:"0.1.0",toVersion:"0.2.0",sourceRevision:"sha-next",artifactSha:"artifact-next",destination:"demo-runtime",selectedDelta:["add manifest"],evidence:["test://candidate"],approval:{status:"APPROVED",by:"BIG"}});
+console.log("PREFLIGHT",await system.preflight(workId));
+console.log("RELEASE",await system.release(workId));
+console.log("READBACK",await system.readback({workId,observedVersion:update.toVersion,observedRevision:update.sourceRevision,observedArtifactSha:update.artifactSha,observedDestination:"demo-runtime",passed:true,evidence:["runtime://demo"]}));
