@@ -15,6 +15,12 @@ export function createOlympusServer({ system } = {}) {
       if (method === "GET" && url.pathname === "/health") return json(res, 200, { ok:true, system:"OLYMPUS", builder:"LIGHT", authority:"BIG" });
       if (method === "GET" && url.pathname === "/snapshot") return json(res, 200, await system.snapshot());
       if (method === "GET" && url.pathname === "/cards") { const state=await system.snapshot(); return json(res, 200, state.cards.filter(card => !url.searchParams.get("appId") || card.appId === url.searchParams.get("appId"))); }
+      if (method === "GET" && url.pathname === "/apps") return json(res, 200, await system.listApps());
+      if (method === "GET" && parts[0] === "apps" && parts[2] === "manifest") return json(res, 200, await system.integrationManifest(parts[1]));
+      if (method === "GET" && parts[0] === "apps" && parts[2] === "current") return json(res, 200, await system.currentVersion(parts[1]));
+      if (method === "GET" && parts[0] === "apps" && parts[2] === "versions") return json(res, 200, await system.versions(parts[1]));
+      if (method === "GET" && parts[0] === "apps" && parts[2] === "updates") return json(res, 200, (await system.appStatus(parts[1])).updates);
+      if (method === "GET" && parts[0] === "apps" && parts.length === 2) return json(res, 200, await system.appStatus(parts[1]));
       const input = method === "POST" ? await body(req) : null;
       if (method === "POST" && parts[0] === "apps" && parts.length === 1) return json(res, 201, await system.registerApp(input));
       if (method === "POST" && parts[0] === "apps" && parts[2] === "current") return json(res, 201, await system.registerCurrent({ ...input, appId: parts[1] }));
