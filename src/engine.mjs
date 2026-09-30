@@ -93,7 +93,7 @@ export class OlympusSystem {
   }); }
   async referenceCard(input) { return this.mutate(state => {
     const appId = assertAppId(input.appId), current = state.versions[appId] || null;
-    const output = card("REFERENCE", { kind: "WORK_CARD", workId, checkpointId: assertRequired(input.checkpointId, "checkpointId"), appId, query: input.query || null, current: current && cloneValue(current), cases: state.cases.filter(x => x.appId === appId), status: current ? "READY" : STATES.UNKNOWN, unknowns: current ? [] : ["CURRENT_VERSION"] }, this.now);
+    const output = card("REFERENCE", { kind: "WORK_CARD", workId: assertRequired(input.workId, "workId"), checkpointId: assertRequired(input.checkpointId, "checkpointId"), appId, query: input.query || null, current: current && cloneValue(current), cases: state.cases.filter(x => x.appId === appId), status: current ? "READY" : STATES.UNKNOWN, unknowns: current ? [] : ["CURRENT_VERSION"] }, this.now);
     state.cards.push(output); this.event(state, "REFERENCE_CARD_CREATED", { cardId: output.cardId, appId }); return output;
   }); }
   async createUpdate(input) { return this.mutate(state => {
