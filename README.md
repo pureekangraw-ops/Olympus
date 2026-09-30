@@ -21,7 +21,7 @@ Evidence         = proof
 Runtime Readback = final reality check
 ```
 
-`RELEASED` is not `VERIFIED`. A new Current version is recorded only when runtime readback matches version, source revision, artifact SHA, and destination.
+`RELEASED` is not `VERIFIED`. A new Current version is recorded only when runtime readback matches version, source revision, artifact SHA, and destination. `POST /apps/:appId/current` is a one-time bootstrap for an app with no Current; once Current exists, every later change must pass update → preflight → release → runtime readback.
 
 ## API
 
@@ -73,3 +73,12 @@ An update becomes `VERIFIED` only after the target reports matching version, sou
 ```txt
 POST /updates/:workId/readback
 ```
+
+
+## Release-path invariants
+
+- Current cannot be overwritten directly after bootstrap.
+- Readback cannot verify an update before the release gate has moved it to `READBACK_PENDING`.
+- A mismatched readback may be retried; a verified update cannot be reopened through readback.
+- Runtime destination is required proof. Omitting it is a mismatch, not a pass.
+- A release manifest carries both `fromVersion` and target `version`, so the manifest-to-update path cannot lose the Current transition.
