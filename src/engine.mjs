@@ -143,16 +143,103 @@ export class OlympusSystem {
     state.cards.push(output); this.event(state, "READBACK_COMPLETED", { workId: input.workId, result: output.readbackResult }); return output;
   }); }
   async rollback(input) { return this.mutate(state => {
-    const appId = assertAppId(input.appId), app = this.app(state, appId), targetVersion = assertVersionForScheme(input.targetVersion, app.versionScheme);
-    const target = list(state.versionHistory?.[appId]).find(entry => entry.version === targetVersion && entry.status !== "SUPERSEDED");
-    if (!target) throw new Error("ROLLBACK_TARGET_UNKNOWN");
+    const appId = assertAppId(input.appId), app = this.app(state, appId), current = state.versions[appId];
+    if (!current) throw new Error("CURRENT_VERSION_UNKNOWN");
+    const targetVersion = assertVersionForScheme(input.targetVersion, app.versionScheme);
+    const requestedRevision = input.targetSourceRevision == null ? null : assertRequired(input.targetSourceRevision, "targetSourceRevision");
+    const historical = list(state.versionHistory?.[appId]).filter(entry =>
+      entry.version === targetVersion &&
+      (!requestedRevision || entry.sourceRevision === requestedRevision)
+    );
+    if (!historical.length) throw new Error("ROLLBACK_TARGET_UNKNOWN");
+
+    const identities = new Map();
+    for (const entry of historical) {
+      const key = `${entry.version}\u0000${entry.sourceRevision}\u0000${entry.artifactSha}`;
+      identities.set(key, entry);
+    }
+    if (!requestedRevision && identities.size > 1) throw new Error("ROLLBACK_TARGET_AMBIGUOUS");
+    const target = [...identities.values()].at(-1);
+
+    if (
+      current.version === target.version &&
+      current.sourceRevision === target.sourceRevision &&
+      current.artifactSha === target.artifactSha
+    ) throw new Error("ROLLBACK_TARGET_IS_CURRENT");
+
     if (app.rules.requireApproval && input.approval?.status !== "APPROVED") throw new Error("BIG_APPROVAL_MISSING");
     if (!Array.isArray(input.evidence) || !input.evidence.length) throw new Error("EVIDENCE_MISSING");
     const workId = assertRequired(input.workId, "workId");
     if (state.rollbacks[workId]) throw new Error("ROLLBACK_ALREADY_EXISTS");
-    const record = { kind: "ROLLBACK", workId, checkpointId: assertRequired(input.checkpointId, "checkpointId"), appId, fromVersion: state.versions[appId]?.version, targetVersion, sourceRevision: target.sourceRevision, artifactSha: target.artifactSha, destination: app.destination, reason: assertRequired(input.reason, "reason"), evidence: cloneValue(input.evidence), approval: cloneValue(input.approval), status: STATES.ROLLBACK_PENDING, createdAt: this.now() };
-    state.rollbacks[workId] = record; this.event(state, "ROLLBACK_REQUESTED", { workId, appId, targetVersion });
-    return card("ROLLBACK", { kind: "WORK_CARD", ...record }, this.now);
+
+    const record = {
+      kind:"ROLLBACK",
+      workId,
+      checkpointId:assertRequired(input.checkpointId, "checkpointId"),
+      appId,
+      fromVersion:current.version,
+      fromSourceRevision:current.sourceRevision,
+      fromArtifactSha:current.artifactSha,
+      targetVersion:target.version,
+      sourceRevision:target.sourceRevision,
+      artifactSha:target.artifactSha,
+      destination:app.destination,
+      reason:assertRequired(input.reason, "reason"),
+      evidence:cloneValue(input.evidence),
+      approval:cloneValue(input.approval),
+      status:STATES.ROLLBACK_PENDING,
+      createdAt:this.now(),
+    };
+    state.rollbacks[workId] = record;
+    this.event(state, "ROLLBACK_REQUESTED", { workId, appId, fromVersion:current.version, targetVersion:target.version, sourceRevision:target.sourceRevision });
+    return card("ROLLBACK", { kind:"WORK_CARD", ...record }, this.now);
+  }); }
+
+  async rollbackReadback(input) { return this.mutate(state => {
+    const workId = assertRequired(input.workId, "workId");
+    const rollback = state.rollbacks?.[workId];
+    if (!rollback) throw new Error("ROLLBACK_UNKNOWN");
+    if (![STATES.ROLLBACK_PENDING, STATES.MISMATCH].includes(rollback.status)) {
+      throw new Error("ROLLBACK_READBACK_STATE_INVALID");
+    }
+
+    const matches =
+      input.passed === true &&
+      input.observedVersion === rollback.targetVersion &&
+      input.observedRevision === rollback.sourceRevision &&
+      input.observedArtifactSha === rollback.artifactSha &&
+      input.observedDestination === rollback.destination;
+
+    rollback.status = matches ? STATES.ROLLED_BACK : STATES.MISMATCH;
+    rollback.lastReadbackAt = this.now();
+
+    if (matches) {
+      const previous = state.versions[rollback.appId] || null;
+      this.recordVersion(state, rollback.appId, {
+        appId:rollback.appId,
+        version:rollback.targetVersion,
+        sourceRevision:rollback.sourceRevision,
+        artifactSha:rollback.artifactSha,
+        runtimeIdentity:input.observedRuntimeIdentity || input.observedRevision,
+        status:"CURRENT",
+        evidence:[...cloneValue(rollback.evidence || []), ...cloneValue(input.evidence || [])],
+        updatedAt:this.now(),
+      }, previous);
+    }
+
+    const output = card("ROLLBACK_READBACK", {
+      kind:"WORK_CARD",
+      ...rollback,
+      observedVersion:input.observedVersion,
+      observedRevision:input.observedRevision,
+      observedArtifactSha:input.observedArtifactSha,
+      observedDestination:input.observedDestination,
+      readbackResult:matches ? STATES.ROLLED_BACK : STATES.MISMATCH,
+      readbackEvidence:cloneValue(input.evidence || []),
+    }, this.now);
+    state.cards.push(output);
+    this.event(state, "ROLLBACK_READBACK_COMPLETED", { workId, appId:rollback.appId, result:output.readbackResult });
+    return output;
   }); }
   async debug(input) { return this.mutate(state => { const output = card("DEBUG", { kind: "WORK_CARD", workId: assertRequired(input.workId, "workId"), appId: assertAppId(input.appId), symptom: assertRequired(input.symptom, "symptom"), suspectedCause: input.suspectedCause || null, evidence: cloneValue(input.evidence || []), status: STATES.UNKNOWN }, this.now); state.cards.push(output); this.event(state, "DEBUG_CARD_CREATED", { cardId: output.cardId }); return output; }); }
   async snapshot() { return this.store.read(); }
