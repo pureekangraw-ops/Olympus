@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { JsonStore } from '../src/store.mjs';
 import { OlympusSystem } from '../src/engine.mjs';
 import { createFileRuntimeAdapter } from '../src/runtime-adapter.mjs';
-import { createReleaseManifest } from '../src/release-manifest.mjs';
+import { createReleaseManifest, manifestToUpdateInput } from '../src/release-manifest.mjs';
 
 async function setup() {
   const dir = await mkdtemp(join(tmpdir(), 'olympus-safety-'));
@@ -41,8 +41,37 @@ test('file runtime adapter installs, activates, reads back, and rolls back', asy
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
-test('release manifest is explicit and validated', () => {
-  const manifest = createReleaseManifest({ appId: 'safe-app', version: '1.1.0', sourceRevision: 's', artifactSha: 'a', destination: 'safe-runtime', workId: 'W', checkpointId: 'CP', evidenceRefs: ['e'] });
+test('release manifest is explicit, transition-complete, and maps into update input', () => {
+  const manifest = createReleaseManifest({
+    appId: 'safe-app',
+    fromVersion: '1.0.0',
+    version: '1.1.0',
+    sourceRevision: 's',
+    artifactSha: 'a',
+    artifactRef: 'manifest://safe-app/1.1.0',
+    destination: 'safe-runtime',
+    workId: 'W',
+    checkpointId: 'CP',
+    selectedDelta: ['ship 1.1.0'],
+    rejectedDelta: ['skip experimental flag'],
+    evidenceRefs: ['e'],
+  });
   assert.equal(manifest.schema, 'OLYMPUS_RELEASE_MANIFEST_V1');
+  assert.equal(manifest.fromVersion, '1.0.0');
   assert.deepEqual(manifest.evidenceRefs, ['e']);
+
+  const input = manifestToUpdateInput(manifest, { status: 'APPROVED', by: 'BIG' });
+  assert.equal(input.fromVersion, '1.0.0');
+  assert.equal(input.toVersion, '1.1.0');
+  assert.equal(input.manifestRef, 'manifest://safe-app/1.1.0');
+  assert.deepEqual(input.selectedDelta, ['ship 1.1.0']);
+  assert.deepEqual(input.rejectedDelta, ['skip experimental flag']);
+  assert.equal(input.approval.status, 'APPROVED');
+});
+
+test('release manifest cannot omit the source Current version', () => {
+  assert.throws(
+    () => createReleaseManifest({ appId: 'safe-app', version: '1.1.0', sourceRevision: 's', artifactSha: 'a', destination: 'safe-runtime', workId: 'W', checkpointId: 'CP', evidenceRefs: ['e'] }),
+    /fromVersion is required/,
+  );
 });
