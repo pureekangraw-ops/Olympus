@@ -31,7 +31,8 @@ export function createOlympusServer({ system } = {}) {
       if (method === "POST" && parts[0] === "updates" && parts[2] === "preflight") return json(res, 200, await system.preflight(parts[1]));
       if (method === "POST" && parts[0] === "updates" && parts[2] === "release") return json(res, 200, await system.release(parts[1]));
       if (method === "POST" && parts[0] === "updates" && parts[2] === "readback") return json(res, 200, await system.readback({ ...input, workId: parts[1] }));
-      if (method === "POST" && parts[0] === "rollbacks") return json(res, 201, await system.rollback(input));
+      if (method === "POST" && parts[0] === "rollbacks" && parts.length === 1) return json(res, 201, await system.rollback(input));
+      if (method === "POST" && parts[0] === "rollbacks" && parts[2] === "readback") return json(res, 200, await system.rollbackReadback({ ...input, workId: parts[1] }));
       if (method === "POST" && parts[0] === "debug") return json(res, 201, await system.debug(input));
       return json(res, 404, { error:"NOT_FOUND" });
     } catch (error) { return json(res, 400, { error:error.message }); }
