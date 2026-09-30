@@ -18,9 +18,12 @@ export function createOlympusClient({ baseUrl, appId, fetchImpl = fetch } = {}) 
     getCurrent: () => request(`/apps/${encodeURIComponent(appId)}/current`),
     getVersions: () => request(`/apps/${encodeURIComponent(appId)}/versions`),
     getUpdates: () => request(`/apps/${encodeURIComponent(appId)}/updates`),
+    getRollbacks: () => request(`/apps/${encodeURIComponent(appId)}/rollbacks`),
     createUpdate: input => request("/updates", { method: "POST", body: JSON.stringify({ ...input, appId }) }),
     preflight: workId => request(`/updates/${encodeURIComponent(workId)}/preflight`, { method: "POST", body: "{}" }),
     release: workId => request(`/updates/${encodeURIComponent(workId)}/release`, { method: "POST", body: "{}" }),
     readback: (workId, input) => request(`/updates/${encodeURIComponent(workId)}/readback`, { method: "POST", body: JSON.stringify(input) }),
+    requestRollback: input => request("/rollbacks", { method: "POST", body: JSON.stringify({ ...input, appId }) }),
+    rollbackReadback: (workId, input) => request(`/rollbacks/${encodeURIComponent(workId)}/readback`, { method: "POST", body: JSON.stringify(input) }),
   });
 }
