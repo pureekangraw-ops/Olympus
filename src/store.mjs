@@ -3,9 +3,10 @@ import { dirname, join } from "node:path";
 import { mkdir } from "node:fs/promises";
 
 export const emptyState = () => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   apps: {},
   versions: {},
+  versionHistory: {},
   cases: [],
   cards: [],
   updates: {},
