@@ -63,6 +63,8 @@ export class OlympusSystem {
       versions: cloneValue(list(state.versionHistory?.[appId])),
       updates: Object.values(state.updates).filter(update => update.appId === appId)
         .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).map(cloneValue),
+      rollbacks: Object.values(state.rollbacks || {}).filter(rollback => rollback.appId === appId)
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).map(cloneValue),
     };
   }
   async currentVersion(appIdInput) {
@@ -84,7 +86,10 @@ export class OlympusSystem {
       endpoints: {
         status: `/apps/${appId}`, current: `/apps/${appId}/current`,
         versions: `/apps/${appId}/versions`, updates: `/apps/${appId}/updates`,
+        rollbacks: `/apps/${appId}/rollbacks`,
         readback: "/updates/{workId}/readback",
+        rollbackRequest: "/rollbacks",
+        rollbackReadback: "/rollbacks/{workId}/readback",
       },
     };
   }
