@@ -94,7 +94,12 @@ export function createAionResolver({ system, now = () => new Date().toISOString(
         try {
           const manifest = await system.integrationManifest(entry.systemId);
           const point = connectionPoint(manifest);
-          return { ...cloneValue(entry), target:point?.target || null, releaseTruthRef:point?.releaseTruthRef || entry.provenanceRef || null };
+          const verified = entry.currentStatus === 'CURRENT' && point;
+          return {
+            ...cloneValue(entry),
+            target:verified ? point.target : null,
+            releaseTruthRef:verified ? point.releaseTruthRef : null,
+          };
         } catch { return { ...cloneValue(entry), target:null, releaseTruthRef:null, currentStatus:AION_STATUS.UNKNOWN }; }
       }));
     },
