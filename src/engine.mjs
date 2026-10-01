@@ -71,6 +71,23 @@ export class OlympusSystem {
     const appId = assertAppId(appIdInput), state = await this.snapshot();
     this.app(state, appId); return cloneValue(state.versions[appId] || null);
   }
+  async reportCurrent(input) { return this.mutate(state => {
+    const appId = assertAppId(input.appId), app = this.app(state, appId);
+    const evidence = cloneValue(input.evidence || []);
+    const status = input.verified === true && evidence.length ? "CURRENT" : "PENDING_VERIFICATION";
+    const candidate = this.versionRecord(input, status, app);
+    candidate.owner = assertRequired(input.owner, "owner");
+    candidate.provenanceRef = assertRequired(input.provenanceRef, "provenanceRef");
+    candidate.reportedAt = this.now();
+    if (status !== "CURRENT") {
+      this.event(state, "CURRENT_REPORT_PENDING", { appId, version:candidate.version });
+      return cloneValue(candidate);
+    }
+    const previous = state.versions[appId] || null;
+    this.recordVersion(state, appId, candidate, previous);
+    this.event(state, "CURRENT_REPORT_ACCEPTED", { appId, version:candidate.version, owner:candidate.owner });
+    return cloneValue(state.versions[appId]);
+  }); }
   async currentRegistry() {
     const state = await this.snapshot();
     return Object.values(state.apps).map(app => {
