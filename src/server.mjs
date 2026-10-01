@@ -16,6 +16,7 @@ export function createOlympusServer({ system } = {}) {
       if (method === "GET" && url.pathname === "/snapshot") return json(res, 200, await system.snapshot());
       if (method === "GET" && url.pathname === "/cards") { const state=await system.snapshot(); return json(res, 200, state.cards.filter(card => !url.searchParams.get("appId") || card.appId === url.searchParams.get("appId"))); }
       if (method === "GET" && url.pathname === "/apps") return json(res, 200, await system.listApps());
+      if (method === "GET" && url.pathname === "/registry/current") return json(res, 200, { system:"OLYMPUS", authority:"CURRENT_VERSION_REGISTRY", entries:await system.currentRegistry() });
       if (method === "GET" && parts[0] === "apps" && parts[2] === "manifest") return json(res, 200, await system.integrationManifest(parts[1]));
       if (method === "GET" && parts[0] === "apps" && parts[2] === "current") return json(res, 200, await system.currentVersion(parts[1]));
       if (method === "GET" && parts[0] === "apps" && parts[2] === "versions") return json(res, 200, await system.versions(parts[1]));
