@@ -26,6 +26,7 @@ export function createOlympusServer({ system } = {}) {
       const input = method === "POST" ? await body(req) : null;
       if (method === "POST" && parts[0] === "apps" && parts.length === 1) return json(res, 201, await system.registerApp(input));
       if (method === "POST" && parts[0] === "apps" && parts[2] === "current") return json(res, 201, await system.registerCurrent({ ...input, appId: parts[1] }));
+      if (method === "POST" && parts[0] === "reports" && parts[1] === "current") return json(res, 202, await system.reportCurrent(input));
       if (method === "POST" && parts[0] === "cases") return json(res, 201, await system.recordCase(input));
       if (method === "POST" && parts[0] === "references") return json(res, 201, await system.referenceCard(input));
       if (method === "POST" && parts[0] === "updates" && parts.length === 1) return json(res, 201, await system.createUpdate(input));
