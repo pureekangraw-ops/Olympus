@@ -71,6 +71,25 @@ export class OlympusSystem {
     const appId = assertAppId(appIdInput), state = await this.snapshot();
     this.app(state, appId); return cloneValue(state.versions[appId] || null);
   }
+  async currentRegistry() {
+    const state = await this.snapshot();
+    return Object.values(state.apps).map(app => {
+      const current = state.versions[app.appId] || null;
+      return {
+        systemId: app.appId,
+        domain: app.destination,
+        currentStatus: current ? current.status : STATES.UNKNOWN,
+        version: current?.version || null,
+        revision: current?.sourceRevision || null,
+        artifactSha: current?.artifactSha || null,
+        runtime: current?.runtimeIdentity || null,
+        evidence: cloneValue(current?.evidence || []),
+        verifiedAt: current?.updatedAt || null,
+        provenanceRef: current?.provenanceRef || null,
+        owner: current?.owner || app.appId,
+      };
+    }).sort((a, b) => a.systemId.localeCompare(b.systemId));
+  }
   async versions(appIdInput) {
     const appId = assertAppId(appIdInput), state = await this.snapshot();
     this.app(state, appId); return cloneValue(list(state.versionHistory?.[appId]));

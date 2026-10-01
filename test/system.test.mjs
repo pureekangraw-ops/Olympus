@@ -112,3 +112,26 @@ test("rollback API client exposes request, list, and exact readback",async()=>{c
   assert.equal(result.readbackResult,"ROLLED_BACK");
   assert.equal((await client.getCurrent()).version,"0.1.0");
 }finally{server.close();await rm(dir,{recursive:true,force:true})}});
+
+
+test("Current Version Registry exposes identity without taking source ownership", async () => {
+  const { emptyState } = await import("../src/store.mjs");
+  let state = emptyState();
+  const store = { async read(){ return structuredClone(state); }, async transact(fn){ const result = await fn(state); return structuredClone(result); } };
+  const system = new OlympusSystem({ store });
+  await system.registerApp({ appId:"factory", destination:"ERGASTERION" });
+  let registry = await system.currentRegistry();
+  assert.equal(registry.length, 1);
+  assert.equal(registry[0].systemId, "factory");
+  assert.equal(registry[0].domain, "ERGASTERION");
+  assert.equal(registry[0].currentStatus, "UNKNOWN");
+  assert.equal(registry[0].version, null);
+
+  await system.registerCurrent({ appId:"factory", version:"1.0.0", sourceRevision:"abc123", artifactSha:"sha256:factory", runtimeIdentity:"worker:factory", evidence:["factory-readback://1"] });
+  registry = await system.currentRegistry();
+  assert.equal(registry[0].version, "1.0.0");
+  assert.equal(registry[0].revision, "abc123");
+  assert.equal(registry[0].runtime, "worker:factory");
+  assert.deepEqual(registry[0].evidence, ["factory-readback://1"]);
+  assert.equal(registry[0].owner, "factory");
+});
