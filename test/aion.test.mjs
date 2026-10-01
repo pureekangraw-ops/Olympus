@@ -25,4 +25,19 @@ test('AION distinguishes stale version from artifact or destination mismatch wit
 test('AION returns UNKNOWN when the App Registry connection point is absent', async () => { const { system, dir }=await setup({connectionPoint:false}); try { const result=await createAionResolver({system}).resolve(query()); assert.equal(result.status,'UNKNOWN'); assert.equal(result.reason,'CONNECTION_POINT_UNKNOWN'); assert.equal(result.target,null); } finally { await rm(dir,{recursive:true,force:true}); } });
 test('AION rejects non-DIRECT App profiles', async () => { const { system, dir }=await setup({mode:'PULL'}); try { const result=await createAionResolver({system}).resolve(query()); assert.equal(result.status,'UNKNOWN'); assert.equal(result.reason,'CONNECTION_POINT_UNKNOWN'); assert.equal(result.target,null); assert.equal(result.releaseTruthRef,null); } finally { await rm(dir,{recursive:true,force:true}); } });
 test('AION rejects connection points marked direct:false', async () => { const { system, dir }=await setup({direct:false}); try { const result=await createAionResolver({system}).resolve(query()); assert.equal(result.status,'UNKNOWN'); assert.equal(result.reason,'CONNECTION_POINT_UNKNOWN'); assert.equal(result.target,null); assert.equal(result.releaseTruthRef,null); } finally { await rm(dir,{recursive:true,force:true}); } });
+test('AION registry does not expose targets unless Current and DIRECT truth are valid', async () => {
+  const cases = [
+    { options:{current:false}, label:'missing Current' },
+    { options:{mode:'PULL'}, label:'mode PULL' },
+    { options:{direct:false}, label:'direct false' },
+  ];
+  for (const { options, label } of cases) {
+    const { system, dir } = await setup(options);
+    try {
+      const [entry] = await createAionResolver({system}).registry();
+      assert.equal(entry.target, null, `${label}: target`);
+      assert.equal(entry.releaseTruthRef, null, `${label}: releaseTruthRef`);
+    } finally { await rm(dir,{recursive:true,force:true}); }
+  }
+});
 test('AION registry exposes direct connection points without becoming an executor', async () => { const { system, dir }=await setup(); try { const entries=await createAionResolver({system}).registry(); assert.equal(entries.length,1); assert.equal(entries[0].systemId,'prism'); assert.equal(entries[0].target,'app://prism-owner'); assert.equal(entries[0].domain,'PRISM_NATIVE'); } finally { await rm(dir,{recursive:true,force:true}); } });
