@@ -135,3 +135,22 @@ test("Current Version Registry exposes identity without taking source ownership"
   assert.deepEqual(registry[0].evidence, ["factory-readback://1"]);
   assert.equal(registry[0].owner, "factory");
 });
+
+
+test("current reports require verification and evidence before promotion", async () => {
+  const { emptyState } = await import("../src/store.mjs");
+  let state = emptyState();
+  const store = { async read(){ return structuredClone(state); }, async transact(fn){ const result = await fn(state); return structuredClone(result); } };
+  const system = new OlympusSystem({ store });
+  await system.registerApp({ appId:"ergasterion", destination:"ERGASTERION" });
+
+  const pending = await system.reportCurrent({ appId:"ergasterion", version:"1", sourceRevision:"rev-1", artifactSha:"sha-1", runtimeIdentity:"worker-1", owner:"ERGASTERION", provenanceRef:"github://factory/rev-1", verified:false, evidence:[] });
+  assert.equal(pending.status, "PENDING_VERIFICATION");
+  assert.equal(await system.currentVersion("ergasterion"), null);
+
+  const current = await system.reportCurrent({ appId:"ergasterion", version:"1", sourceRevision:"rev-1", artifactSha:"sha-1", runtimeIdentity:"worker-1", owner:"ERGASTERION", provenanceRef:"github://factory/rev-1", verified:true, evidence:["factory-readback://handoff-1"] });
+  assert.equal(current.status, "CURRENT");
+  assert.equal(current.owner, "ERGASTERION");
+  assert.equal(current.provenanceRef, "github://factory/rev-1");
+  assert.equal((await system.currentRegistry())[0].version, "1");
+});
