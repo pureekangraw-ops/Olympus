@@ -1,0 +1,1 @@
+{"name":"olympus","main":"cloudflare/worker.mjs","compatibility_date":"2026-10-01","kv_namespaces":[{"binding":"OLYMPUS_STATE","id":"REPLACE_WITH_KV_NAMESPACE_ID","preview_id":"REPLACE_WITH_PREVIEW_KV_NAMESPACE_ID"}]}
