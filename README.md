@@ -2,7 +2,21 @@
 
 Standalone version-truth and release-governance system built by **LIGHT** from BIG's design.
 
-OLYMPUS has no dependency on GO Hub, Control Room, or AION. It owns its own registry, cards, evidence ledger, release gates, runtime readback, and debug loop. Target applications connect through their own App Profile and direct release/readback contract.
+The system-facing role and boundary are proposed in [`docs/ROLE-AND-BOUNDARY-CONTRACT-v0.1.md`](docs/ROLE-AND-BOUNDARY-CONTRACT-v0.1.md), currently `DRAFT v0.1 — awaiting BIG approval`. In that draft, **Current Governance Command Center** means governance coordination over Current, version, provenance, and evidence. It does not mean a central CPU, a city-work executor, or a runtime dependency on GO Hub.
+
+OLYMPUS has no runtime dependency on GO Hub, Control Room, or AION. It owns its own registry, cards, evidence ledger, release gates, runtime readback, and debug loop. Target applications connect through their own App Profile and direct release/readback contract.
+
+## Role boundary
+
+The draft Role & Boundary Contract is documentation-only and does not change the implementation described in this README.
+
+- OLYMPUS coordinates Current governance, checks Contract, detects conflict/stale state, and controls promotion.
+- OLYMPUS is not the central CPU and does not perform work owned by a target application, Core, or city.
+- The Current Version Registry is OLYMPUS's governance record; Source, Artifact, and Runtime ownership remain with their real owners.
+- GO Hub Control Room and AION are future boundary/candidate topics only. No ownership move, runtime change, route change, API, or authority change is authorized by the draft.
+- `PENDING_VERIFICATION` means the evidence or readback required to claim Current is not complete; it must not be treated as `CURRENT`.
+
+Until BIG approves the draft and implementation/live validation is completed, the existing standalone runtime boundary remains authoritative.
 
 ## Internal zones
 
