@@ -29,6 +29,7 @@ export class OlympusSystem {
         release: cloneValue(integration.release || profile.release || {}),
         readback: cloneValue(integration.readback || profile.readback || {}),
         rollback: cloneValue(integration.rollback || profile.rollback || {}),
+        connectionPoint: cloneValue(integration.connectionPoint || {}),
       },
       rules: { requireApproval: true, requireEvidence: true, allowDowngrade: false, requireManifest: false, ...(profile.rules || {}) },
       createdAt: this.now(),

@@ -19,6 +19,7 @@ export function createOlympusClient({ baseUrl, appId, fetchImpl = fetch } = {}) 
     getVersions: () => request(`/apps/${encodeURIComponent(appId)}/versions`),
     getUpdates: () => request(`/apps/${encodeURIComponent(appId)}/updates`),
     getRollbacks: () => request(`/apps/${encodeURIComponent(appId)}/rollbacks`),
+    resolveAion: input => request("/aion/resolve", { method: "POST", body: JSON.stringify({ ...input, appId }) }),
     createUpdate: input => request("/updates", { method: "POST", body: JSON.stringify({ ...input, appId }) }),
     preflight: workId => request(`/updates/${encodeURIComponent(workId)}/preflight`, { method: "POST", body: "{}" }),
     release: workId => request(`/updates/${encodeURIComponent(workId)}/release`, { method: "POST", body: "{}" }),
