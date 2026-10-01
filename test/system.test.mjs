@@ -115,8 +115,10 @@ test("rollback API client exposes request, list, and exact readback",async()=>{c
 
 
 test("Current Version Registry exposes identity without taking source ownership", async () => {
-  const { MemoryStore } = await import("../src/runtime-adapter.mjs");
-  const system = new OlympusSystem({ store:new MemoryStore() });
+  const { emptyState } = await import("../src/store.mjs");
+  let state = emptyState();
+  const store = { async read(){ return structuredClone(state); }, async transact(fn){ const result = await fn(state); return structuredClone(result); } };
+  const system = new OlympusSystem({ store });
   await system.registerApp({ appId:"factory", destination:"ERGASTERION" });
   let registry = await system.currentRegistry();
   assert.equal(registry.length, 1);
