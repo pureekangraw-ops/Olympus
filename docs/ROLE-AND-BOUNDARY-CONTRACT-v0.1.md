@@ -62,7 +62,10 @@ OLYMPUS may return one or more of:
 - `REJECTED`;
 - `RETURN_FOR_REVISION`;
 - `ESCALATION_REQUIRED`;
-- `UNKNOWN`.
+- `UNKNOWN`;
+- `PENDING_VERIFICATION`.
+
+`PENDING_VERIFICATION` means that the evidence or readback required to claim Current is not complete. It must not be treated as `CURRENT`.
 
 Every material result must point back to the relevant Source, Artifact, and Evidence.
 
