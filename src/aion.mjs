@@ -39,9 +39,14 @@ export function createConnectionPoint(input = {}) {
 }
 
 function connectionPoint(manifest) {
-  const value = manifest?.app?.integration?.connectionPoint;
+  const integration = manifest?.app?.integration;
+  if (integration?.mode !== 'DIRECT') return null;
+  const value = integration.connectionPoint;
   if (!value || typeof value !== 'object') return null;
-  try { return createConnectionPoint(value); } catch { return null; }
+  try {
+    const point = createConnectionPoint(value);
+    return point.direct === true ? point : null;
+  } catch { return null; }
 }
 
 export function createAionResolver({ system, now = () => new Date().toISOString() } = {}) {
@@ -60,13 +65,16 @@ export function createAionResolver({ system, now = () => new Date().toISOString(
       const point = connectionPoint(manifest);
       const base = {
         appId,
-        target: point?.target || null,
-        releaseTruthRef: point?.releaseTruthRef || current?.provenanceRef || null,
         destination: manifest?.app?.destination || null,
       };
       if (!current || current.status !== 'CURRENT') return proof(input, { ...base, reason:'CURRENT_VERSION_UNKNOWN', unknowns:['CURRENT_VERSION_UNKNOWN'] });
       if (!point) return proof(input, { ...base, reason:'CONNECTION_POINT_UNKNOWN', unknowns:['CONNECTION_POINT_UNKNOWN'] });
-      if (!base.releaseTruthRef) return proof(input, { ...base, reason:'RELEASE_TRUTH_REF_UNKNOWN', unknowns:['RELEASE_TRUTH_REF_UNKNOWN'] });
+      const verifiedBase = {
+        ...base,
+        target: point.target,
+        releaseTruthRef: point.releaseTruthRef || current.provenanceRef || null,
+      };
+      if (!verifiedBase.releaseTruthRef) return proof(input, { ...base, reason:'RELEASE_TRUTH_REF_UNKNOWN', unknowns:['RELEASE_TRUTH_REF_UNKNOWN'] });
       const required = ['version','sourceRevision','artifactSha','destination'];
       const missing = required.filter(key => !text(input[key]));
       if (missing.length) return proof(input, { ...base, reason:'RESOLUTION_INPUT_UNKNOWN', unknowns:missing.map(key => `${key.toUpperCase()}_UNKNOWN`) });
@@ -77,7 +85,7 @@ export function createAionResolver({ system, now = () => new Date().toISOString(
         ['destination', manifest.app.destination],
       ].find(([key, expected]) => text(input[key]) !== text(expected));
       if (mismatch) return proof(input, { ...base, status:AION_STATUS.MISMATCH, reason:`${mismatch[0].toUpperCase()}_MISMATCH`, unknowns:[] });
-      return proof(input, { ...base, status:AION_STATUS.VERIFIED, reason:'OLYMPUS_TRUTH_MATCHED', verifiedAt:now(), unknowns:[] });
+      return proof(input, { ...verifiedBase, status:AION_STATUS.VERIFIED, reason:'OLYMPUS_TRUTH_MATCHED', verifiedAt:now(), unknowns:[] });
     },
     async registry() {
       if (typeof system.currentRegistry !== 'function') return [];
