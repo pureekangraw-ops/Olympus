@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { STATES, assertAppId, assertRequired, assertVersionForScheme, compareVersions, cloneValue } from "./model.mjs";
+import { STATES, assertAppId, assertCapabilityId, assertRequired, assertVersionForScheme, compareVersions, cloneValue } from "./model.mjs";
 
 const id = prefix => `${prefix}-${randomUUID()}`;
 const card = (type, body, now) => ({ cardId: id(type), cardType: type, createdAt: now(), ...cloneValue(body) });
@@ -17,6 +17,7 @@ export class OlympusSystem {
     const integration = cloneValue(profile.integration || {});
     state.apps[appId] = {
       kind: "APP_PROFILE", appId, name: profile.name || appId,
+      capabilityIds: [...new Set(list(profile.capabilityIds).map(assertCapabilityId))],
       versionScheme: profile.versionScheme || "custom",
       destination: assertRequired(profile.destination, "destination"),
       storage: cloneValue(profile.storage || {}),
@@ -89,6 +90,47 @@ export class OlympusSystem {
     this.event(state, "CURRENT_REPORT_ACCEPTED", { appId, version:candidate.version, owner:candidate.owner });
     return cloneValue(state.versions[appId]);
   }); }
+  async capabilityRegistry() {
+    const state = await this.snapshot();
+    const groups = new Map();
+    for (const app of Object.values(state.apps)) {
+      for (const capabilityId of list(app.capabilityIds)) {
+        const current = state.versions[app.appId] || null;
+        const entry = {
+          capabilityId,
+          implementationId:app.appId,
+          displayName:app.name,
+          destination:app.destination,
+          currentStatus:current?.status || STATES.UNKNOWN,
+          version:current?.version || null,
+          sourceRevision:current?.sourceRevision || null,
+          artifactSha:current?.artifactSha || null,
+          runtimeIdentity:current?.runtimeIdentity || null,
+          verifiedAt:current?.updatedAt || null,
+          provenanceRef:current?.provenanceRef || null,
+        };
+        if (!groups.has(capabilityId)) groups.set(capabilityId, []);
+        groups.get(capabilityId).push(entry);
+      }
+    }
+    return [...groups.entries()].map(([capabilityId, implementations]) => {
+      const current = implementations.filter(entry => entry.currentStatus === "CURRENT");
+      return {
+        capabilityId,
+        status:current.length === 1 ? "CURRENT" : current.length > 1 ? "CONFLICT" : "UNKNOWN",
+        currentImplementation:current.length === 1 ? cloneValue(current[0]) : null,
+        implementations:cloneValue(implementations.sort((a,b) => a.implementationId.localeCompare(b.implementationId))),
+        unknowns:current.length > 1 ? ["MULTIPLE_CURRENT_IMPLEMENTATIONS"] : current.length === 0 ? ["CURRENT_IMPLEMENTATION_UNKNOWN"] : [],
+      };
+    }).sort((a,b) => a.capabilityId.localeCompare(b.capabilityId));
+  }
+  async resolveCapability(capabilityIdInput) {
+    const capabilityId = assertCapabilityId(capabilityIdInput);
+    const registry = await this.capabilityRegistry();
+    return registry.find(entry => entry.capabilityId === capabilityId) || {
+      capabilityId, status:"UNKNOWN", currentImplementation:null, implementations:[], unknowns:["CAPABILITY_UNKNOWN"],
+    };
+  }
   async currentRegistry() {
     const state = await this.snapshot();
     return Object.values(state.apps).map(app => {
@@ -289,6 +331,17 @@ export class OlympusSystem {
   app(state, appId) { const value = state.apps[appId]; if (!value) throw new Error(`unknown app: ${appId}`); return value; }
   update(state, workId) { const value = state.updates[assertRequired(workId, "workId")]; if (!value) throw new Error(`unknown update: ${workId}`); return value; }
   recordVersion(state, appId, version, previous) {
+    if (version?.status === "CURRENT") {
+      const app = this.app(state, appId);
+      for (const capabilityId of list(app.capabilityIds)) {
+        const conflict = Object.values(state.apps).find(other =>
+          other.appId !== appId &&
+          list(other.capabilityIds).includes(capabilityId) &&
+          state.versions[other.appId]?.status === "CURRENT"
+        );
+        if (conflict) throw new Error(`CAPABILITY_CURRENT_CONFLICT:${capabilityId}:${conflict.appId}`);
+      }
+    }
     if (!state.versionHistory) state.versionHistory = {};
     state.versionHistory[appId] ||= [];
     const history = state.versionHistory[appId];
