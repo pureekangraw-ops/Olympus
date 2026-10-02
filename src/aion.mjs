@@ -1,6 +1,7 @@
 import { assertAppId, cloneValue } from './model.mjs';
 
 export const AION_SCHEMA = 'AION_TRUST_PROOF_V1';
+export const AION_CAPABILITY_SCHEMA = 'AION_CAPABILITY_TRUST_PROOF_V1';
 export const AION_STATUS = Object.freeze({ VERIFIED:'VERIFIED', MISMATCH:'MISMATCH', STALE:'STALE', UNKNOWN:'UNKNOWN' });
 const text = value => String(value ?? '').trim();
 const safeAppId = value => { try { return assertAppId(value); } catch { return null; } };
@@ -52,6 +53,28 @@ function connectionPoint(manifest) {
 export function createAionResolver({ system, now = () => new Date().toISOString() } = {}) {
   if (!system || typeof system.integrationManifest !== 'function' || typeof system.currentVersion !== 'function') throw new Error('AION_OLYMPUS_SYSTEM_REQUIRED');
   return Object.freeze({
+    async resolveCapability(input = {}) {
+      const capabilityId = text(input.capabilityId).toUpperCase();
+      if (!capabilityId || typeof system.resolveCapability !== 'function') {
+        return { schema:AION_CAPABILITY_SCHEMA, capabilityId:capabilityId || null, status:AION_STATUS.UNKNOWN, currentImplementation:null, target:null, releaseTruthRef:null, unknowns:['CAPABILITY_UNKNOWN'] };
+      }
+      const resolved = await system.resolveCapability(capabilityId);
+      if (resolved.status !== 'CURRENT' || !resolved.currentImplementation) {
+        return { schema:AION_CAPABILITY_SCHEMA, ...cloneValue(resolved), target:null, releaseTruthRef:null };
+      }
+      const impl = resolved.currentImplementation;
+      let manifest;
+      try { manifest = await system.integrationManifest(impl.implementationId); }
+      catch { return { schema:AION_CAPABILITY_SCHEMA, ...cloneValue(resolved), status:AION_STATUS.UNKNOWN, target:null, releaseTruthRef:null, unknowns:['IMPLEMENTATION_PROFILE_UNKNOWN'] }; }
+      const point = connectionPoint(manifest);
+      if (!point) return { schema:AION_CAPABILITY_SCHEMA, ...cloneValue(resolved), status:AION_STATUS.UNKNOWN, target:null, releaseTruthRef:null, unknowns:['CONNECTION_POINT_UNKNOWN'] };
+      return {
+        schema:AION_CAPABILITY_SCHEMA,
+        ...cloneValue(resolved),
+        target:point.target,
+        releaseTruthRef:point.releaseTruthRef || impl.provenanceRef || null,
+      };
+    },
     async resolve(input = {}) {
       const appId = safeAppId(input.appId);
       if (!appId) return proof(input, { reason:'APP_ID_UNKNOWN', unknowns:['APP_ID_UNKNOWN'] });
