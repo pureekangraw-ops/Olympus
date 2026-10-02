@@ -28,3 +28,32 @@ test('cloud AION registry hides target for non-DIRECT profile',async()=>{
  await call(env,'/reports/current','POST',{appId:'prism',version:'1',sourceRevision:'r1',artifactSha:'a1',runtimeIdentity:'apk://1',owner:'PRISM',provenanceRef:'truth://prism',destination:'PRISM_NATIVE',verified:true,evidence:['e://1']});
  const reg=await call(env,'/aion/registry');assert.equal(reg.body.entries[0].target,null);assert.equal(reg.body.entries[0].releaseTruthRef,null);
 });
+
+
+test('cloud capability registry keeps stable role identity across display-name changes',async()=>{
+ const env={OLYMPUS_STATE:kv()};
+ await call(env,'/apps','POST',{appId:'prism-browser',name:'AURORA',destination:'PRISM_NATIVE',capabilityIds:['OBSERVER'],integration:{mode:'DIRECT',connectionPoint:{appId:'prism-browser',target:'app://prism-browser-owner',releaseTruthRef:'truth://prism-browser',direct:true}}});
+ await call(env,'/reports/current','POST',{appId:'prism-browser',version:'1',sourceRevision:'r1',artifactSha:'a1',runtimeIdentity:'apk://1',owner:'PRISM',provenanceRef:'truth://prism-browser',destination:'PRISM_NATIVE',verified:true,evidence:['e://1']});
+ const reg=await call(env,'/registry/capabilities');
+ assert.equal(reg.body.entries[0].capabilityId,'OBSERVER');
+ assert.equal(reg.body.entries[0].status,'CURRENT');
+ assert.equal(reg.body.entries[0].currentImplementation.implementationId,'prism-browser');
+ assert.equal(reg.body.entries[0].currentImplementation.displayName,'AURORA');
+ const proof=await call(env,'/aion/capabilities/OBSERVER');
+ assert.equal(proof.body.schema,'AION_CAPABILITY_TRUST_PROOF_V1');
+ assert.equal(proof.body.target,'app://prism-browser-owner');
+});
+
+test('cloud runtime rejects two CURRENT implementations for one capability',async()=>{
+ const env={OLYMPUS_STATE:kv()};
+ const one={mode:'DIRECT',connectionPoint:{appId:'one',target:'app://one',releaseTruthRef:'truth://one',direct:true}};
+ const two={mode:'DIRECT',connectionPoint:{appId:'two',target:'app://two',releaseTruthRef:'truth://two',direct:true}};
+ await call(env,'/apps','POST',{appId:'one',destination:'ONE',capabilityIds:['OBSERVER'],integration:one});
+ await call(env,'/apps','POST',{appId:'two',destination:'TWO',capabilityIds:['OBSERVER'],integration:two});
+ await call(env,'/reports/current','POST',{appId:'one',version:'1',sourceRevision:'r1',artifactSha:'a1',runtimeIdentity:'one://1',owner:'ONE',provenanceRef:'truth://one',destination:'ONE',verified:true,evidence:['e://1']});
+ const conflict=await call(env,'/reports/current','POST',{appId:'two',version:'1',sourceRevision:'r2',artifactSha:'a2',runtimeIdentity:'two://1',owner:'TWO',provenanceRef:'truth://two',destination:'TWO',verified:true,evidence:['e://2']});
+ assert.equal(conflict.status,409);
+ assert.match(conflict.body.error,/CAPABILITY_CURRENT_CONFLICT:OBSERVER:one/);
+ const reg=await call(env,'/registry/capabilities');
+ assert.equal(reg.body.entries[0].currentImplementation.implementationId,'one');
+});
