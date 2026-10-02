@@ -19,7 +19,10 @@ export function createOlympusServer({ system } = {}) {
       if (method === "GET" && url.pathname === "/cards") { const state=await system.snapshot(); return json(res, 200, state.cards.filter(card => !url.searchParams.get("appId") || card.appId === url.searchParams.get("appId"))); }
       if (method === "GET" && url.pathname === "/apps") return json(res, 200, await system.listApps());
       if (method === "GET" && url.pathname === "/registry/current") return json(res, 200, { system:"OLYMPUS", authority:"CURRENT_VERSION_REGISTRY", entries:await system.currentRegistry() });
+      if (method === "GET" && url.pathname === "/registry/capabilities") return json(res, 200, { system:"OLYMPUS", authority:"CAPABILITY_CURRENT_REGISTRY_V1", entries:await system.capabilityRegistry() });
       if (method === "GET" && url.pathname === "/aion/registry") return json(res, 200, { schema:"AION_TRUST_PROOF_V1", source:"OLYMPUS", entries:await aion.registry() });
+      if (method === "GET" && parts[0] === "aion" && parts[1] === "capabilities" && parts.length === 3) return json(res, 200, await aion.resolveCapability({ capabilityId:parts[2] }));
+      if (method === "GET" && parts[0] === "capabilities" && parts.length === 2) return json(res, 200, await system.resolveCapability(parts[1]));
       if (method === "GET" && parts[0] === "apps" && parts[2] === "manifest") return json(res, 200, await system.integrationManifest(parts[1]));
       if (method === "GET" && parts[0] === "apps" && parts[2] === "current") return json(res, 200, await system.currentVersion(parts[1]));
       if (method === "GET" && parts[0] === "apps" && parts[2] === "versions") return json(res, 200, await system.versions(parts[1]));
